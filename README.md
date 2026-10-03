@@ -1,12 +1,12 @@
 ```python
-import random
 import json
 import os
+import random
 import time
 
 
 # ============================================================
-# 🎮 УГАДАЙ ЧИСЛО — ULTIMATE EDITION 2.0
+# 🎮 УГАДАЙ ЧИСЛО — ULTIMATE EDITION 3.0
 # ============================================================
 
 SAVE_FILE = "player_data.json"
@@ -27,7 +27,29 @@ WHITE = "\033[97m"
 
 
 # ============================================================
-# 💾 СОХРАНЕНИЕ
+# 🧰 ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ============================================================
+
+def clear_screen():
+    """Очищает экран."""
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def pause(message="\nНажми Enter, чтобы продолжить..."):
+    input(message)
+
+
+def print_box(text, color=CYAN):
+    """Красивый вывод сообщения."""
+    border = "═" * (len(text) + 4)
+
+    print(color + f"╔{border}╗" + RESET)
+    print(color + f"║  {text}  ║" + RESET)
+    print(color + f"╚{border}╝" + RESET)
+
+
+# ============================================================
+# 💾 ДАННЫЕ ИГРОКА
 # ============================================================
 
 def default_data():
@@ -35,18 +57,26 @@ def default_data():
         "coins": 100,
         "xp": 0,
         "level": 1,
+
         "wins": 0,
         "losses": 0,
+        "games": 0,
+
         "best_attempts": None,
+
         "win_streak": 0,
         "best_streak": 0,
-        "games": 0,
+
         "hints": 2,
-        "extra_attempts": 0
+        "extra_attempts": 0,
+
+        "total_xp": 0,
+        "total_coins": 0
     }
 
 
 def load_data():
+    """Загружает профиль игрока."""
     if not os.path.exists(SAVE_FILE):
         return default_data()
 
@@ -54,26 +84,36 @@ def load_data():
         with open(SAVE_FILE, "r", encoding="utf-8") as file:
             data = json.load(file)
 
-        # Если в старом сохранении нет новых параметров
         default = default_data()
 
+        # Добавляем отсутствующие параметры
         for key, value in default.items():
             if key not in data:
                 data[key] = value
 
         return data
 
-    except (json.JSONDecodeError, OSError):
-        print(RED + "⚠️ Не удалось загрузить сохранение. Создан новый профиль." + RESET)
+    except (json.JSONDecodeError, OSError, TypeError):
+        print(RED + "⚠️ Ошибка загрузки сохранения!" + RESET)
+        print("Создаём новый профиль...")
+        time.sleep(1)
+
         return default_data()
 
 
 def save_data():
+    """Сохраняет профиль игрока."""
     try:
         with open(SAVE_FILE, "w", encoding="utf-8") as file:
-            json.dump(player, file, indent=4, ensure_ascii=False)
+            json.dump(
+                player,
+                file,
+                indent=4,
+                ensure_ascii=False
+            )
+
     except OSError:
-        print(RED + "❌ Ошибка сохранения!" + RESET)
+        print(RED + "❌ Не удалось сохранить игру!" + RESET)
 
 
 player = load_data()
@@ -83,26 +123,39 @@ player = load_data()
 # ⭐ XP И УРОВНИ
 # ============================================================
 
+def xp_needed():
+    """Количество XP для следующего уровня."""
+    return player["level"] * 100
+
+
 def add_xp(amount):
+    """Добавляет XP и проверяет повышение уровня."""
     player["xp"] += amount
+    player["total_xp"] += amount
 
-    while player["xp"] >= player["level"] * 100:
-        needed_xp = player["level"] * 100
+    while player["xp"] >= xp_needed():
 
-        player["xp"] -= needed_xp
+        required = xp_needed()
+
+        player["xp"] -= required
         player["level"] += 1
+
+        # Бонус за уровень
         player["coins"] += 50
+        player["total_coins"] += 50
 
         print()
-        print(GREEN + "╔══════════════════════════════╗" + RESET)
-        print(GREEN + "║      🎉 НОВЫЙ УРОВЕНЬ!      ║" + RESET)
-        print(GREEN + "╚══════════════════════════════╝" + RESET)
-        print(f"⭐ Теперь твой уровень: {player['level']}")
-        print("💰 Бонус: +50 монет!")
+
+        print_box(
+            f"🎉 НОВЫЙ УРОВЕНЬ: {player['level']}!",
+            GREEN
+        )
+
+        print("⭐ Получено: +50 монет!")
 
 
 # ============================================================
-# 🖥️ ЗАГОЛОВОК
+# 🎮 ЗАГОЛОВОК
 # ============================================================
 
 def title():
@@ -110,6 +163,7 @@ def title():
     print("╔════════════════════════════════════════════╗")
     print("║          🎮 УГАДАЙ ЧИСЛО 🎮              ║")
     print("║             ULTIMATE EDITION              ║")
+    print("║                   v3.0                    ║")
     print("╚════════════════════════════════════════════╝")
     print(RESET)
 
@@ -119,17 +173,28 @@ def title():
 # ============================================================
 
 def profile():
-    print()
+    clear_screen()
+    title()
+
     print(MAGENTA + "╔════════════ 👤 ПРОФИЛЬ ════════════╗" + RESET)
 
     print(f"⭐ Уровень: {player['level']}")
-    print(f"✨ XP: {player['xp']}/{player['level'] * 100}")
+    print(f"✨ XP: {player['xp']}/{xp_needed()}")
     print(f"💰 Монеты: {player['coins']}")
+
+    print()
+
     print(f"🎯 Побед: {player['wins']}")
     print(f"💀 Поражений: {player['losses']}")
+    print(f"🎮 Всего игр: {player['games']}")
+
+    print()
+
     print(f"🔥 Текущая серия: {player['win_streak']}")
     print(f"🏆 Лучшая серия: {player['best_streak']}")
-    print(f"🎮 Всего игр: {player['games']}")
+
+    print()
+
     print(f"🔮 Подсказок: {player['hints']}")
     print(f"❤️ Доп. попыток: {player['extra_attempts']}")
 
@@ -144,7 +209,14 @@ def profile():
     else:
         print(f"🏆 Рекорд: {player['best_attempts']} попыток")
 
+    print()
+
+    print(f"📈 Всего получено XP: {player['total_xp']}")
+    print(f"💰 Всего заработано монет: {player['total_coins']}")
+
     print(MAGENTA + "╚════════════════════════════════════╝" + RESET)
+
+    pause()
 
 
 # ============================================================
@@ -153,48 +225,88 @@ def profile():
 
 def shop():
     while True:
-        print()
+        clear_screen()
+        title()
+
         print(YELLOW + "╔════════════ 🛒 МАГАЗИН ════════════╗" + RESET)
-        print(f"💰 Монеты: {player['coins']}")
+        print(f"💰 Твои монеты: {player['coins']}")
         print()
+
         print("1. 🔮 Подсказка — 30 монет")
         print("2. ❤️ Дополнительная попытка — 50 монет")
-        print("3. 💎 100 XP — 80 монет")
-        print("4. 🚪 Выйти")
+        print("3. ⭐ 100 XP — 80 монет")
+        print("4. 🎁 Большой пакет — 250 монет")
+        print("5. 🚪 Выйти")
 
         choice = input("\n👉 Выбери товар: ").strip()
 
+        # Подсказка
         if choice == "1":
+
             if player["coins"] >= 30:
                 player["coins"] -= 30
                 player["hints"] += 1
+
                 print(GREEN + "✅ Подсказка куплена!" + RESET)
+
             else:
                 print(RED + "❌ Недостаточно монет!" + RESET)
 
+        # Попытка
         elif choice == "2":
+
             if player["coins"] >= 50:
                 player["coins"] -= 50
                 player["extra_attempts"] += 1
-                print(GREEN + "✅ Дополнительная попытка куплена!" + RESET)
+
+                print(
+                    GREEN +
+                    "✅ Дополнительная попытка куплена!"
+                    + RESET
+                )
+
             else:
                 print(RED + "❌ Недостаточно монет!" + RESET)
 
+        # XP
         elif choice == "3":
+
             if player["coins"] >= 80:
                 player["coins"] -= 80
+
                 add_xp(100)
+
                 print(GREEN + "✅ Получено 100 XP!" + RESET)
+
             else:
                 print(RED + "❌ Недостаточно монет!" + RESET)
 
+        # Большой пакет
         elif choice == "4":
+
+            if player["coins"] >= 250:
+                player["coins"] -= 250
+
+                player["hints"] += 3
+                player["extra_attempts"] += 2
+                add_xp(150)
+
+                print(GREEN + "🎁 Большой пакет получен!" + RESET)
+                print("🔮 +3 подсказки")
+                print("❤️ +2 попытки")
+                print("⭐ +150 XP")
+
+            else:
+                print(RED + "❌ Недостаточно монет!" + RESET)
+
+        elif choice == "5":
             break
 
         else:
-            print(RED + "❌ Выбери пункт от 1 до 4." + RESET)
+            print(RED + "❌ Выбери пункт от 1 до 5!" + RESET)
 
         save_data()
+        time.sleep(1)
 
 
 # ============================================================
@@ -205,20 +317,23 @@ def choose_mode():
 
     print()
     print(BLUE + "╔════════════ 🎯 РЕЖИМЫ ════════════╗" + RESET)
-    print("1. 🟢 Легко      — 1-50   | 10 попыток")
-    print("2. 🟡 Средне     — 1-100  | 7 попыток")
-    print("3. 🔴 Сложно     — 1-500  | 10 попыток")
-    print("4. 💀 Безумие    — 1-1000 | 8 попыток")
-    print("5. 🎲 Хаос       — случайный диапазон")
+
+    print("1. 🟢 Легко       — 1-50    | 10 попыток")
+    print("2. 🟡 Средне      — 1-100   | 7 попыток")
+    print("3. 🔴 Сложно      — 1-500   | 10 попыток")
+    print("4. 💀 Безумие     — 1-1000  | 8 попыток")
+    print("5. 🎲 Хаос        — случайный диапазон")
+    print("6. 👑 Легенда     — 1-10000 | 10 попыток")
 
     while True:
+
         choice = input("\n👉 Выбери режим: ").strip()
 
         if choice == "1":
             return "Легко", 50, 10
 
         elif choice == "2":
-            return "Средне", 100, 7
+            return "Средно", 100, 7
 
         elif choice == "3":
             return "Сложно", 500, 10
@@ -229,10 +344,14 @@ def choose_mode():
         elif choice == "5":
             maximum = random.randint(100, 5000)
             attempts = random.randint(5, 12)
+
             return "Хаос", maximum, attempts
 
+        elif choice == "6":
+            return "Легенда", 10000, 10
+
         else:
-            print(RED + "❌ Выбери число от 1 до 5." + RESET)
+            print(RED + "❌ Выбери число от 1 до 6!" + RESET)
 
 
 # ============================================================
@@ -247,15 +366,19 @@ def use_hint(secret_number, maximum):
 
     player["hints"] -= 1
 
-    hint_type = random.randint(1, 5)
+    hint_type = random.randint(1, 6)
+
+    print()
 
     if hint_type == 1:
+
         if secret_number % 2 == 0:
             print("🔮 Число ЧЁТНОЕ.")
         else:
             print("🔮 Число НЕЧЁТНОЕ.")
 
     elif hint_type == 2:
+
         middle = maximum // 2
 
         if secret_number <= middle:
@@ -264,25 +387,48 @@ def use_hint(secret_number, maximum):
             print("🔮 Число находится во ВТОРОЙ половине.")
 
     elif hint_type == 3:
+
         if secret_number % 5 == 0:
             print("🔮 Число делится на 5.")
         else:
             print("🔮 Число НЕ делится на 5.")
 
     elif hint_type == 4:
+
         if secret_number % 10 == 0:
             print("🔮 Число заканчивается на 0.")
+
         elif secret_number % 5 == 0:
             print("🔮 Число заканчивается на 5.")
+
         else:
             print("🔮 Число не заканчивается на 0 или 5.")
 
-    else:
-        # Подсказка с диапазоном
-        low = max(1, secret_number - maximum // 10)
-        high = min(maximum, secret_number + maximum // 10)
+    elif hint_type == 5:
 
-        print(f"🔮 Число находится примерно между {low} и {high}.")
+        if secret_number > maximum * 0.75:
+            print("🔮 Число находится в верхней четверти.")
+
+        elif secret_number > maximum * 0.5:
+            print("🔮 Число находится между половиной и 75%.")
+
+        elif secret_number > maximum * 0.25:
+            print("🔮 Число находится между 25% и половиной.")
+
+        else:
+            print("🔮 Число находится в нижней четверти.")
+
+    else:
+
+        radius = max(5, maximum // 10)
+
+        low = max(1, secret_number - radius)
+        high = min(maximum, secret_number + radius)
+
+        print(
+            f"🔮 Число находится примерно между "
+            f"{low} и {high}."
+        )
 
     print(f"🔮 Осталось подсказок: {player['hints']}")
 
@@ -295,14 +441,19 @@ def temperature_hint(secret_number, guess, maximum):
 
     difference = abs(secret_number - guess)
 
+    percent = difference / maximum
+
     if difference <= 3:
         print(RED + "🔥 ОЧЕНЬ ГОРЯЧО!" + RESET)
 
-    elif difference <= 10:
+    elif percent <= 0.05:
         print(YELLOW + "🔥 Горячо!" + RESET)
 
-    elif difference <= maximum * 0.25:
+    elif percent <= 0.15:
         print("🙂 Тепло.")
+
+    elif percent <= 0.30:
+        print("😐 Прохладно.")
 
     else:
         print(CYAN + "❄️ Холодно..." + RESET)
@@ -314,15 +465,28 @@ def temperature_hint(secret_number, guess, maximum):
 
 def calculate_reward(maximum, attempts, max_attempts):
 
-    score = max(10, (max_attempts - attempts + 1) * 20)
+    # Чем меньше попыток — тем больше XP
+    score = max(
+        10,
+        (max_attempts - attempts + 1) * 20
+    )
 
-    if maximum >= 1000:
+    # Сложные режимы дают больше награды
+    if maximum >= 10000:
+        score *= 5
+
+    elif maximum >= 1000:
         score *= 3
 
     elif maximum >= 500:
         score *= 2
 
-    coins = max(1, score // 5)
+    coins = max(5, score // 5)
+
+    # Бонус за победную серию
+    streak_bonus = min(player["win_streak"] * 5, 50)
+
+    coins += streak_bonus
 
     return score, coins
 
@@ -333,70 +497,133 @@ def calculate_reward(maximum, attempts, max_attempts):
 
 def play_game():
 
+    clear_screen()
+    title()
+
     mode, maximum, max_attempts = choose_mode()
 
     secret_number = random.randint(1, maximum)
 
-    # Используем купленную попытку
-    if player["extra_attempts"] > 0:
-        max_attempts += player["extra_attempts"]
+    # Дополнительные попытки
+    bonus_attempts = player["extra_attempts"]
+
+    if bonus_attempts > 0:
+
+        max_attempts += bonus_attempts
+        player["extra_attempts"] = 0
 
         print(
-            GREEN
-            + f"❤️ Использовано дополнительных попыток: "
-              f"{player['extra_attempts']}"
+            GREEN +
+            f"\n❤️ Получено дополнительных попыток: "
+            f"+{bonus_attempts}"
             + RESET
         )
 
-        player["extra_attempts"] = 0
-
     attempts = 0
+    used_numbers = set()
 
     print()
     print(GREEN + f"🎮 Режим: {mode}" + RESET)
     print(f"🎯 Диапазон: 1–{maximum}")
     print(f"❤️ Попыток: {max_attempts}")
 
+    print()
+    print("💡 Команды:")
+    print("   hint  — подсказка")
+    print("   menu  — выйти в меню")
+    print("   quit  — выйти из игры")
+
     while attempts < max_attempts:
 
         print()
-        print(f"❤️ Осталось попыток: {max_attempts - attempts}")
-        print(f"🔮 Подсказок: {player['hints']}")
+        print(
+            f"❤️ Осталось попыток: "
+            f"{max_attempts - attempts}"
+        )
 
         user_input = input(
-            "🔢 Введи число или 'hint': "
+            "🔢 Введи число: "
         ).strip().lower()
+
+        # -------------------------
+        # Команды
+        # -------------------------
 
         if user_input == "hint":
             use_hint(secret_number, maximum)
             continue
 
+        if user_input == "menu":
+            print("↩️ Возвращаемся в меню...")
+            time.sleep(1)
+            return
+
+        if user_input == "quit":
+            print("👋 Выход из игры...")
+            save_data()
+            raise SystemExit
+
+        # -------------------------
+        # Проверка числа
+        # -------------------------
+
         try:
             guess = int(user_input)
 
         except ValueError:
-            print(RED + "❌ Введи целое число!" + RESET)
-            continue
-
-        if guess < 1 or guess > maximum:
             print(
-                RED
-                + f"❌ Число должно быть от 1 до {maximum}!"
+                RED +
+                "❌ Введи целое число!"
                 + RESET
             )
             continue
 
+        # -------------------------
+        # Проверка диапазона
+        # -------------------------
+
+        if guess < 1 or guess > maximum:
+
+            print(
+                RED +
+                f"❌ Число должно быть "
+                f"от 1 до {maximum}!"
+                + RESET
+            )
+
+            continue
+
+        # -------------------------
+        # Проверка повторения
+        # -------------------------
+
+        if guess in used_numbers:
+
+            print(
+                YELLOW +
+                "⚠️ Ты уже называл это число!"
+                + RESET
+            )
+
+            continue
+
+        used_numbers.add(guess)
         attempts += 1
 
-        # Победа
+        # -------------------------
+        # ПОБЕДА
+        # -------------------------
+
         if guess == secret_number:
 
             print()
-            print(GREEN + "╔════════════════════════════════╗" + RESET)
-            print(GREEN + "║        🎉 ПОБЕДА! 🎉          ║" + RESET)
-            print(GREEN + "╚════════════════════════════════╝" + RESET)
 
-            print(f"🎯 Число: {secret_number}")
+            print_box(
+                "🎉 ПОБЕДА! 🎉",
+                GREEN
+            )
+
+            print(f"🎯 Загаданное число: {secret_number}")
             print(f"🔢 Попыток: {attempts}")
 
             score, coins = calculate_reward(
@@ -405,35 +632,74 @@ def play_game():
                 max_attempts
             )
 
+            player["coins"] += coins
+            player["total_coins"] += coins
+
+            player["wins"] += 1
+            player["games"] += 1
+
+            player["win_streak"] += 1
+
+            print()
             print(f"⭐ XP: +{score}")
             print(f"💰 Монеты: +{coins}")
 
-            player["coins"] += coins
-            player["wins"] += 1
-            player["games"] += 1
-            player["win_streak"] += 1
-
+            # Рекорд серии
             if player["win_streak"] > player["best_streak"]:
-                player["best_streak"] = player["win_streak"]
-                print(YELLOW + "🔥 НОВЫЙ РЕКОРД СЕРИИ!" + RESET)
 
+                player["best_streak"] = player["win_streak"]
+
+                print(
+                    YELLOW +
+                    "🔥 НОВЫЙ РЕКОРД СЕРИИ!"
+                    + RESET
+                )
+
+            # Рекорд попыток
             if (
                 player["best_attempts"] is None
                 or attempts < player["best_attempts"]
             ):
+
                 player["best_attempts"] = attempts
-                print(YELLOW + "🏆 НОВЫЙ РЕКОРД ПОПЫТОК!" + RESET)
+
+                print(
+                    YELLOW +
+                    "🏆 НОВЫЙ РЕКОРД ПОПЫТОК!"
+                    + RESET
+                )
 
             add_xp(score)
+
             save_data()
+
+            pause()
 
             return
 
-        # Подсказка больше / меньше
+        # -------------------------
+        # ПОДСКАЗКА БОЛЬШЕ / МЕНЬШЕ
+        # -------------------------
+
         if guess < secret_number:
-            print(BLUE + "📈 Моё число БОЛЬШЕ!" + RESET)
+
+            print(
+                BLUE +
+                "📈 Моё число БОЛЬШЕ!"
+                + RESET
+            )
+
         else:
-            print(YELLOW + "📉 Моё число МЕНЬШЕ!" + RESET)
+
+            print(
+                YELLOW +
+                "📉 Моё число МЕНЬШЕ!"
+                + RESET
+            )
+
+        # -------------------------
+        # ГОРЯЧО / ХОЛОДНО
+        # -------------------------
 
         temperature_hint(
             secret_number,
@@ -441,11 +707,16 @@ def play_game():
             maximum
         )
 
-    # Проигрыш
+    # ========================================================
+    # 💀 ПРОИГРЫШ
+    # ========================================================
+
     print()
-    print(RED + "╔════════════════════════════════╗" + RESET)
-    print(RED + "║       💀 ТЫ ПРОИГРАЛ 💀       ║" + RESET)
-    print(RED + "╚════════════════════════════════╝" + RESET)
+
+    print_box(
+        "💀 ТЫ ПРОИГРАЛ 💀",
+        RED
+    )
 
     print(f"😈 Загаданное число: {secret_number}")
 
@@ -455,6 +726,8 @@ def play_game():
 
     save_data()
 
+    pause()
+
 
 # ============================================================
 # 📜 ПРАВИЛА
@@ -462,46 +735,93 @@ def play_game():
 
 def rules():
 
-    print()
-    print(CYAN + "╔════════════ 📜 ПРАВИЛА ════════════╗" + RESET)
+    clear_screen()
+    title()
+
+    print_box("📜 ПРАВИЛА", CYAN)
 
     print("""
-🎯 Цель:
-Угадать загаданное компьютером число.
+🎯 ЦЕЛЬ
+Угадать число, которое загадал компьютер.
 
-📈 Если твоё число меньше — компьютер сообщит:
-   «Моё число БОЛЬШЕ».
+📈 ЕСЛИ ЧИСЛО МЕНЬШЕ
+Компьютер сообщит:
+«Моё число БОЛЬШЕ».
 
-📉 Если твоё число больше — компьютер сообщит:
-   «Моё число МЕНЬШЕ».
+📉 ЕСЛИ ЧИСЛО БОЛЬШЕ
+Компьютер сообщит:
+«Моё число МЕНЬШЕ».
 
-🔥 Чем ближе ты к числу, тем горячее подсказка.
+🔥 ГОРЯЧО / ХОЛОДНО
+Чем ближе твоя попытка к загаданному числу,
+тем горячее подсказка.
 
-🔮 Командой "hint" можно использовать подсказку.
+🔮 ПОДСКАЗКИ
+Во время игры введи:
+hint
 
-💰 За победу ты получаешь монеты.
+🛒 МАГАЗИН
+За монеты можно покупать:
+• подсказки
+• дополнительные попытки
+• XP
+• специальные наборы
 
-⭐ За победу ты получаешь XP.
+⭐ XP
+XP повышает уровень.
 
-🆙 XP повышает уровень.
+💰 МОНЕТЫ
+Монеты можно получать за победы
+и повышение уровня.
 
-🔥 Победы подряд увеличивают серию.
+🔥 СЕРИЯ
+Несколько побед подряд увеличивают серию.
 
-🛒 Монеты можно потратить в магазине.
+💾 СОХРАНЕНИЕ
+Прогресс автоматически сохраняется.
 
-💾 Прогресс автоматически сохраняется.
+🎮 КОМАНДЫ
+hint  — подсказка
+menu  — выйти в меню
+quit  — выйти из игры
 """)
 
-    input("Нажми Enter, чтобы вернуться...")
+    pause()
 
 
 # ============================================================
-# 🧹 ОЧИСТКА ЭКРАНА
+# 🧹 СБРОС ПРОФИЛЯ
 # ============================================================
 
-def clear_screen():
+def reset_profile():
 
-    os.system("cls" if os.name == "nt" else "clear")
+    print()
+
+    answer = input(
+        RED +
+        "⚠️ Ты точно хочешь удалить весь прогресс? "
+        "(да/нет): "
+        + RESET
+    ).strip().lower()
+
+    if answer in ("да", "д", "yes", "y"):
+
+        global player
+
+        player = default_data()
+        save_data()
+
+        print(
+            GREEN +
+            "✅ Профиль сброшен!"
+            + RESET
+        )
+
+    else:
+
+        print("↩️ Сброс отменён.")
+
+    time.sleep(1)
 
 
 # ============================================================
@@ -518,23 +838,26 @@ def main():
         print(f"👤 Уровень: {player['level']}")
         print(f"💰 Монеты: {player['coins']}")
         print(f"🔥 Серия: {player['win_streak']}")
-        print(f"⭐ XP: {player['xp']}/{player['level'] * 100}")
+        print(f"⭐ XP: {player['xp']}/{xp_needed()}")
 
         print()
+
         print("1. 🎮 Играть")
         print("2. 👤 Профиль")
         print("3. 🛒 Магазин")
         print("4. 📜 Правила")
-        print("5. 🚪 Выход")
+        print("5. 🗑️ Сбросить прогресс")
+        print("6. 🚪 Выход")
 
-        choice = input("\n👉 Выбери действие: ").strip()
+        choice = input(
+            "\n👉 Выбери действие: "
+        ).strip()
 
         if choice == "1":
             play_game()
 
         elif choice == "2":
             profile()
-            input("\nНажми Enter...")
 
         elif choice == "3":
             shop()
@@ -543,20 +866,42 @@ def main():
             rules()
 
         elif choice == "5":
+            reset_profile()
+
+        elif choice == "6":
+
             save_data()
 
             print()
-            print(GREEN + "💾 Игра сохранена!" + RESET)
+
+            print_box(
+                "💾 Игра сохранена!",
+                GREEN
+            )
+
             print("👋 Спасибо за игру!")
+
             break
 
         else:
-            print(RED + "❌ Такой команды нет!" + RESET)
+
+            print(
+                RED +
+                "❌ Такой команды нет!"
+                + RESET
+            )
+
             time.sleep(1)
 
 
 # ============================================================
 # ▶️ ЗАПУСК
+# ============================================================
+
+if __name__ == "__main__":
+    main()
+```
+
 # ============================================================
 
 if __name__ == "__main__":
